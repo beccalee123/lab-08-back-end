@@ -27,6 +27,7 @@ app.get('/location', (request, response) => {
 app.get('/weather', getWeather);
 app.get('/yelp', getRestaurants);
 app.get('/movies', getMovies);
+app.get('/meetups', getMeetups);
 
 // Helper Functions
 
@@ -81,11 +82,25 @@ function getMovies(request, response) {
 
   superagent.get(url)
   .then(result => {
-    console.log(result.body);
+    // console.log(result.body);
     const movieSummaries = result.body.results.map(film => {
       return new Movie(film);
     });
     response.send(movieSummaries);
+  })
+  .catch(error => handleError(error, response));
+}
+
+function getMeetups(request, response) {
+  const url = `https://api.meetup.com/find/groups?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}`;
+
+  superagent.get(url)
+  .then (result => {
+    console.log(result.body);
+    const meetupSummaries = result.body.events.map(meetups => {
+      return new Meetup(meetups);
+    });
+    response.send(meetupSummaries);
   })
   .catch(error => handleError(error, response));
 }
@@ -130,6 +145,13 @@ function Movie(film){
   this.image_url = `http://image.tmdb.org/t/p/w185/${film.poster_path}`;
   this.popularity = film.popularity;
   this.released_on = film.released_on;
+}
+
+function Meetup(meetups){
+  this.link = meetups.link;
+  this.name = meetups.name;
+  this.host = meetups.host;
+  this.creation_date = meetups.creation_date;
 }
 
 // Make sure the server is listening for requests
