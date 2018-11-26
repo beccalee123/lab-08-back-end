@@ -28,6 +28,7 @@ app.get('/weather', getWeather);
 app.get('/yelp', getRestaurants);
 app.get('/movies', getMovies);
 app.get('/meetups', getMeetups);
+app.get('/trails', getTrails);
 
 // Helper Functions
 
@@ -96,11 +97,25 @@ function getMeetups(request, response) {
 
   superagent.get(url)
   .then (result => {
-    console.log(result.body);
+    // console.log(result.body);
     const meetupSummaries = result.body.events.map(meetups => {
       return new Meetup(meetups);
     });
     response.send(meetupSummaries);
+  })
+  .catch(error => handleError(error, response));
+}
+
+function getTrails(request, response) {
+  const url = `https://www.hikingproject.com/data/get-trails?lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&key=${process.env.HIKING_API_KEY}`;
+
+  superagent.get(url)
+  .then (result => {
+    console.log(result.body);
+    const trailSummaries = result.body.trails.map(hikes => {
+      return new Trail(hikes);
+    });
+    response.send(trailSummaries);
   })
   .catch(error => handleError(error, response));
 }
@@ -152,6 +167,19 @@ function Meetup(meetups){
   this.name = meetups.name;
   this.host = meetups.host;
   this.creation_date = meetups.creation_date;
+}
+
+function Trail(hikes){
+  this.trail_url = hikes.trail_url;
+  this.name = hikes.name;
+  this.location = hikes.location;
+  this.length = hikes.length;
+  this.condition_date = hikes.condition_date;
+  this.condition_time = hikes.condition_time;
+  this.condition = hikes.condition;
+  this.stars = hikes.stars;
+  this.star_votes = hikes.star_votes;
+  this.summary = hikes.summary;
 }
 
 // Make sure the server is listening for requests
