@@ -42,7 +42,6 @@ function searchToLatLong(query) {
   return superagent.get(url)
     //Recieve info
     .then((res) => {
-      // console.log(res.body.results[0]);
       //return new instance/modify object
       return new Location(query, res.body.results[0]);
     })
@@ -69,7 +68,6 @@ function getRestaurants(request, response) {
   superagent.get(url)
     .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
     .then(result => {
-      // console.log(result.body);
       const restaurantSummaries = result.body.businesses.map(business => {
         return new Restaurant(business);
       });
@@ -83,7 +81,7 @@ function getMovies(request, response) {
 
   superagent.get(url)
   .then(result => {
-    // console.log(result.body);
+    console.log(result.body);
     const movieSummaries = result.body.results.map(film => {
       return new Movie(film);
     });
@@ -93,11 +91,10 @@ function getMovies(request, response) {
 }
 
 function getMeetups(request, response) {
-  const url = `https://api.meetup.com/find/upcoming_events?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&pafe=20`;
+  const url = `https://api.meetup.com/find/upcoming_events?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&page=20`;
 
   superagent.get(url)
   .then (result => {
-    // console.log(result.body);
     const meetupSummaries = result.body.events.map(meetups => {
       return new Meetup(meetups);
     });
@@ -111,7 +108,6 @@ function getTrails(request, response) {
 
   superagent.get(url)
   .then (result => {
-    // console.log(result.body);
     const trailSummaries = result.body.trails.map(hikes => {
       return new Trail(hikes);
     });
@@ -136,7 +132,6 @@ function Location(query, data) {
   this.formatted_query = data.formatted_address;
   this.latitude = data.geometry.location.lat;
   this.longitude = data.geometry.location.lng;
-  // console.log(this);
 }
 
 function Weather(day) {
@@ -155,11 +150,11 @@ function Restaurant(business) {
 function Movie(film){
   this.title = film.title;
   this.overview = film.overview;
-  this.average_votes = film.average_votes;
-  this.total_votes = film.total_votes;
+  this.average_votes = film.vote_average;
+  this.total_votes = film.vote_count;
   this.image_url = `http://image.tmdb.org/t/p/w185/${film.poster_path}`;
   this.popularity = film.popularity;
-  this.released_on = film.released_on;
+  this.released_on = film.release_date;
 }
 
 function Meetup(meetups){
@@ -167,7 +162,6 @@ function Meetup(meetups){
   this.name = meetups.name;
   this.host = meetups.group.name;
   this.creation_date = new Date(meetups.created).toDateString();
-  console.log(this.creation_date);
 }
 
 function Trail(hikes){
@@ -175,11 +169,11 @@ function Trail(hikes){
   this.name = hikes.name;
   this.location = hikes.location;
   this.length = hikes.length;
-  this.condition_date = hikes.condition_date;
-  this.condition_time = hikes.condition_time;
-  this.condition = hikes.condition;
+  this.condition_date = hikes.conditionDate.slice(0, 10);
+  this.condition_time = hikes.conditionDate.slice(11, hikes.conditionDate.length);
+  this.conditions = hikes.conditionStatus;
   this.stars = hikes.stars;
-  this.star_votes = hikes.star_votes;
+  this.star_votes = hikes.starVotes;
   this.summary = hikes.summary;
 }
 
