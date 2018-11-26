@@ -93,7 +93,7 @@ function getMovies(request, response) {
 }
 
 function getMeetups(request, response) {
-  const url = `https://api.meetup.com/find/groups?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}`;
+  const url = `https://api.meetup.com/find/upcoming_events?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&pafe=20`;
 
   superagent.get(url)
   .then (result => {
@@ -111,7 +111,7 @@ function getTrails(request, response) {
 
   superagent.get(url)
   .then (result => {
-    console.log(result.body);
+    // console.log(result.body);
     const trailSummaries = result.body.trails.map(hikes => {
       return new Trail(hikes);
     });
@@ -165,8 +165,9 @@ function Movie(film){
 function Meetup(meetups){
   this.link = meetups.link;
   this.name = meetups.name;
-  this.host = meetups.host;
-  this.creation_date = meetups.creation_date;
+  this.host = meetups.group.name;
+  this.creation_date = new Date(meetups.created).toDateString();
+  console.log(this.creation_date);
 }
 
 function Trail(hikes){
