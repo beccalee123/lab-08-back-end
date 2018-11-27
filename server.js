@@ -98,6 +98,36 @@ function getWeather(request, response) {
   })
 }
 
+// Restaurant handlers
+
+function getRestaurants(request, response) {
+  Restaurant.lookup({
+    tableName: Restaurant.tableName,
+
+    location: request.query.data.id,
+
+    cacheHit: function (result) {
+      response.send(result.rows);
+    },
+
+    cacheMiss: function () {
+      const url = `https://api.yelp.com/v3/businesses/search?term=restaurants&latitude=${request.query.data.latitude}&longitude=${request.query.data.longitude}`;
+
+      return superagent.get(url)
+      .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
+        .then(result => {
+          const restaurantSummaries = result.body.businesses.map(business => {
+            const summary = new Restaurant(business);
+            summary.save(request.query.data.id);
+            return summary;
+          });
+          response.send(restaurantSummaries);
+        })
+        .catch(error => handleError(error, response));
+    }
+  })
+}
+
 // Helpers
 // These functions are assigned to properties on the models
 
@@ -147,26 +177,26 @@ function lookup(options) {
 //     .catch(error => handleError(error, response));
 // }
 
-function getRestaurants(request, response) {
-  const url = `https://api.yelp.com/v3/businesses/search?term=restaurants&latitude=${request.query.data.latitude}&longitude=${request.query.data.longitude}`;
+// function getRestaurants(request, response) {
+//   const url = `https://api.yelp.com/v3/businesses/search?term=restaurants&latitude=${request.query.data.latitude}&longitude=${request.query.data.longitude}`;
 
-  superagent.get(url)
-    .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
-    .then(result => {
-      const restaurantSummaries = result.body.businesses.map(business => {
-        return new Restaurant(business);
-      });
-      response.send(restaurantSummaries);
-    })
-    .catch(error => handleError(error, response));
-}
+//   superagent.get(url)
+//     .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
+//     .then(result => {
+//       const restaurantSummaries = result.body.businesses.map(business => {
+//         return new Restaurant(business);
+//       });
+//       response.send(restaurantSummaries);
+//     })
+//     .catch(error => handleError(error, response));
+// }
 
 function getMovies(request, response) {
   const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIESDB_API_KEY}&language=en-US&query=${request.query.data.search_query}`
 
   superagent.get(url)
     .then(result => {
-      console.log(result.body);
+      // console.log(result.body);
       const movieSummaries = result.body.results.map(film => {
         return new Movie(film);
       });
@@ -277,13 +307,31 @@ Weather.prototype = {
   }
 }
 
+//Yelp model
+
 function Restaurant(business) {
+  this.tableName = 'restaurants';
   this.name = business.name;
   this.image_url = business.image_url;
   this.price = business.price;
   this.rating = business.rating;
   this.url = business.url;
+  this.created_at = Date.now();
 }
+
+Restaurant.tableName = 'restaurants';
+Restaurant.lookup = lookup;
+// Restaurant.deleteByLocationId = deleteByLocationId;
+
+Restaurant.prototype = {
+  save: function (location_id) {
+    const SQL = `INSERT INTO ${this.tableName} (name, image_url, price, rating, url, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6, $7);`;
+    const values = [this.name, this.image_url, this.price, this.rating, this.url, this.created_at, location_id];
+    
+    client.query(SQL, values);
+  }
+}
+
 
 function Movie(film) {
   this.title = film.title;
