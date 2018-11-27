@@ -24,14 +24,13 @@ client.on('error', err => console.error(err));
 
 // API Routes
 
-app.get('/location', getLocation);
-
 // app.get('/location', (request, response) => {
 //   searchToLatLong(request.query.data)
 //     .then((location) => response.send(location))
 //     .catch((error) => handleError(error, response));
 // });
 
+app.get('/location', getLocation);
 app.get('/weather', getWeather);
 app.get('/yelp', getRestaurants);
 app.get('/movies', getMovies);
@@ -40,6 +39,8 @@ app.get('/trails', getTrails);
 
 
 //Handlers
+
+//Location handlers
 
 function getLocation(request, response) {
   Location.lookupLocation({
@@ -68,7 +69,53 @@ function getLocation(request, response) {
   })
 }
 
-// Helper Functions
+//Weather handlers
+
+function getWeather(request, response) {
+  Weather.lookup({
+    tableName: Weather.tableName,
+
+    location: request.query.data.id,
+
+    cacheHit: function (result) {
+      response.send(result.rows);
+    },
+
+    cacheMiss: function () {
+      const url = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${request.query.data.latitude},${request.query.data.longitude}`;
+
+      return superagent.get(url)
+        .then(result => {
+          const weatherSummaries = result.body.daily.data.map(day => {
+            const summary = new Weather(day);
+            summary.save(request.query.data.id);
+            return summary;
+          });
+          response.send(weatherSummaries);
+        })
+        .catch(error => handleError(error, response));
+    }
+  })
+}
+
+// Helpers
+// These functions are assigned to properties on the models
+
+//Checks to see if there is DB data for a given location
+function lookup(options) {
+  const SQL = `SELECT * FROM ${options.tableName} WHERE location_id=$1;`;
+  const values = [options.location];
+
+  client.query(SQL, values)
+    .then(result => {
+      if (result.rowCount > 0) {
+        options.cacheHit(result);
+      } else {
+        options.cacheMiss();
+      }
+    })
+    .catch(error => handleError(error));
+}
 
 // function searchToLatLong(query) {
 //   //Originally this referenced getting mock data from the JSON file as initial set up. Since the project is designed to work with APIs the code needed to be updated to submit search queries to APIs and return results.
@@ -86,19 +133,19 @@ function getLocation(request, response) {
 //     .catch((error, res) => handleError(error, res));
 // }
 
-function getWeather(request, response) {
-  const url = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${request.query.data.latitude},${request.query.data.longitude}`;
+// function getWeather(request, response) {
+//   const url = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${request.query.data.latitude},${request.query.data.longitude}`;
 
-  superagent.get(url)
-    .then(result => {
-      const weatherSummaries = result.body.daily.data.map(day => {
-        return new Weather(day);
-      });
+//   superagent.get(url)
+//     .then(result => {
+//       const weatherSummaries = result.body.daily.data.map(day => {
+//         return new Weather(day);
+//       });
 
-      response.send(weatherSummaries);
-    })
-    .catch(error => handleError(error, response));
-}
+//       response.send(weatherSummaries);
+//     })
+//     .catch(error => handleError(error, response));
+// }
 
 function getRestaurants(request, response) {
   const url = `https://api.yelp.com/v3/businesses/search?term=restaurants&latitude=${request.query.data.latitude}&longitude=${request.query.data.longitude}`;
@@ -166,6 +213,8 @@ function handleError(error, res) {
 
 //This object constructor designates the information we want to recieve back from the API. As a result of this, the API will return an object with the requested data.
 
+//Location model
+
 function Location(query, res) {
   this.tableName = 'locations';
   this.search_query = query;
@@ -206,9 +255,26 @@ Location.prototype = {
   }
 };
 
+//Weather model
+
 function Weather(day) {
+  this.tableName = 'weathers';
   this.forecast = day.summary;
   this.time = new Date(day.time * 1000).toString().slice(0, 15);
+  this.created_at = Date.now();
+}
+
+Weather.tableName = 'weathers';
+Weather.lookup = lookup;
+// Weather.deleteByLocationId = deleteByLocationId;
+
+Weather.prototype = {
+  save: function (location_id) {
+    const SQL = `INSERT INTO ${this.tableName} (forecast, time, created_at, location_id) VALUES ($1, $2, $3, $4);`;
+    const values = [this.forecast, this.time, this.created_at, location_id];
+
+    client.query(SQL, values);
+  }
 }
 
 function Restaurant(business) {
