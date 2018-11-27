@@ -128,6 +128,34 @@ function getRestaurants(request, response) {
   })
 }
 
+//MoviesDB handlers
+function getMovies(request, response) {
+  Movie.lookup({
+    tablename: Movie.tableName,
+
+    location: request.query.data.id,
+
+    cacheHit: function (result) {
+      response.send(result.rows);
+    },
+
+    cacheMiss: function () {
+      const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIESDB_API_KEY}&language=en-US&query=${request.query.data.search_query}`;
+
+      return superagent.get(url)
+      .then(result => {
+        const movieSummaries = result.body.results.map( film => {
+          const summary = new Movie(film);
+          summary.save(request.query.data.id);
+          return summary;
+        });
+        response.send(movieSummaries);
+      })
+      .catch(error => handleError(error, response));
+    }
+  })
+}
+
 // Helpers
 // These functions are assigned to properties on the models
 
@@ -147,63 +175,21 @@ function lookup(options) {
     .catch(error => handleError(error));
 }
 
-// function searchToLatLong(query) {
-//   //Originally this referenced getting mock data from the JSON file as initial set up. Since the project is designed to work with APIs the code needed to be updated to submit search queries to APIs and return results.
+//old code
 
-//   //Concatenate URL
-//   // const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${query}&key=${process.env.GEOCODE_API_KEY}`;
-
-//   //Make proxy request
-//   return superagent.get(url)
-//     //Recieve info
-//     .then((res) => {
-//       //return new instance/modify object
-//       return new Location(query, res.body.results[0]);
-//     })
-//     .catch((error, res) => handleError(error, res));
-// }
-
-// function getWeather(request, response) {
-//   const url = `https://api.darksky.net/forecast/${process.env.DARKSKY_API_KEY}/${request.query.data.latitude},${request.query.data.longitude}`;
+// function getMovies(request, response) {
+//   const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIESDB_API_KEY}&language=en-US&query=${request.query.data.search_query}`
 
 //   superagent.get(url)
 //     .then(result => {
-//       const weatherSummaries = result.body.daily.data.map(day => {
-//         return new Weather(day);
+//       // console.log(result.body);
+//       const movieSummaries = result.body.results.map(film => {
+//         return new Movie(film);
 //       });
-
-//       response.send(weatherSummaries);
+//       response.send(movieSummaries);
 //     })
 //     .catch(error => handleError(error, response));
 // }
-
-// function getRestaurants(request, response) {
-//   const url = `https://api.yelp.com/v3/businesses/search?term=restaurants&latitude=${request.query.data.latitude}&longitude=${request.query.data.longitude}`;
-
-//   superagent.get(url)
-//     .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
-//     .then(result => {
-//       const restaurantSummaries = result.body.businesses.map(business => {
-//         return new Restaurant(business);
-//       });
-//       response.send(restaurantSummaries);
-//     })
-//     .catch(error => handleError(error, response));
-// }
-
-function getMovies(request, response) {
-  const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIESDB_API_KEY}&language=en-US&query=${request.query.data.search_query}`
-
-  superagent.get(url)
-    .then(result => {
-      // console.log(result.body);
-      const movieSummaries = result.body.results.map(film => {
-        return new Movie(film);
-      });
-      response.send(movieSummaries);
-    })
-    .catch(error => handleError(error, response));
-}
 
 function getMeetups(request, response) {
   const url = `https://api.meetup.com/find/upcoming_events?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&page=20`;
@@ -327,13 +313,15 @@ Restaurant.prototype = {
   save: function (location_id) {
     const SQL = `INSERT INTO ${this.tableName} (name, image_url, price, rating, url, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6, $7);`;
     const values = [this.name, this.image_url, this.price, this.rating, this.url, this.created_at, location_id];
-    
+
     client.query(SQL, values);
   }
 }
 
+//MoviesDB model
 
 function Movie(film) {
+  this.tableName = 'movies'
   this.title = film.title;
   this.overview = film.overview;
   this.average_votes = film.vote_average;
@@ -341,7 +329,22 @@ function Movie(film) {
   this.image_url = `http://image.tmdb.org/t/p/w185/${film.poster_path}`;
   this.popularity = film.popularity;
   this.released_on = film.release_date;
+  this.created_at = Date.now();
 }
+
+Movie.tableName = 'movies';
+Movie.lookup = lookup;
+// Movie.deleteByLocationId = deleteByLocationId;
+
+Movie.prototype = {
+  save: function (location_id) {
+    const SQL = `INSERT INTO ${this.tableName} (title, overview, average_votes, total_votes, image_url, popularity, released_on, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`;
+    const values = [this.title, this.overview, this.average_votes, this.total_votes, this.image_url, this.popularity, this.released_on, this.created_at, location_id];
+
+    client.query(SQL, values);
+  }
+}
+
 
 function Meetup(meetups) {
   this.link = meetups.link;

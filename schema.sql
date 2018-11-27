@@ -26,3 +26,14 @@ CREATE TABLE IF NOT EXISTS restaurants (
   created_at BIGINT,
   location_id INTEGER NOT NULL REFERENCES locations(id)
 );
+
+CREATE TABLE IF NOT EXISTS movies (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(255),
+  overview VARCHAR(255),
+  average_votes FLOAT,
+  total_votes INTEGER,
+  image_url VARCHAR(255),
+  popularity FLOAT,
+  released_on VARCHAR(255)
+);
