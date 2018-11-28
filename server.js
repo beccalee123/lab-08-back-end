@@ -184,6 +184,35 @@ function getMeetups(request, response) {
   })
 }
 
+//Trails handlers
+
+function getTrails(request, response) {
+  Trail.lookup({
+    tableName: Trail.tableName,
+
+    location: request.query.data.id,
+
+    cacheHit: function(result) {
+      response.send(result.rows);
+    },
+
+    cacheMiss: function () {
+      const url = `https://www.hikingproject.com/data/get-trails?lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&key=${process.env.HIKING_API_KEY}`;
+
+      return superagent.get(url)
+        .then(result => {
+          const trailSummaries = result.body.trails.map(hikes => {
+            const summary = new Trail(hikes);
+            summary.save(request.query.data.id);
+            return summary;
+          });
+          response.send(trailSummaries);
+        })
+        .catch(error => handleError(error, response));
+    }
+  })
+}
+
 // Helpers
 // These functions are assigned to properties on the models
 
@@ -232,18 +261,18 @@ function lookup(options) {
 //     .catch(error => handleError(error, response));
 // }
 
-function getTrails(request, response) {
-  const url = `https://www.hikingproject.com/data/get-trails?lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&key=${process.env.HIKING_API_KEY}`;
+// function getTrails(request, response) {
+//   const url = `https://www.hikingproject.com/data/get-trails?lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&key=${process.env.HIKING_API_KEY}`;
 
-  superagent.get(url)
-    .then(result => {
-      const trailSummaries = result.body.trails.map(hikes => {
-        return new Trail(hikes);
-      });
-      response.send(trailSummaries);
-    })
-    .catch(error => handleError(error, response));
-}
+//   superagent.get(url)
+//     .then(result => {
+//       const trailSummaries = result.body.trails.map(hikes => {
+//         return new Trail(hikes);
+//       });
+//       response.send(trailSummaries);
+//     })
+//     .catch(error => handleError(error, response));
+// }
 
 //Error Handling
 
@@ -397,8 +426,10 @@ Meetup.prototype = {
   }
 }
 
+//Trails model
 
 function Trail(hikes) {
+  this.tableName = 'trails'
   this.trail_url = hikes.trail_url;
   this.name = hikes.name;
   this.location = hikes.location;
@@ -409,7 +440,22 @@ function Trail(hikes) {
   this.stars = hikes.stars;
   this.star_votes = hikes.starVotes;
   this.summary = hikes.summary;
+  this.created_at = Date.now();
 }
+
+Trail.tableName = 'trails';
+Trail.lookup = lookup;
+// Trail.deleteByLocationId = deleteByLocationId;
+
+Trail.prototype = {
+  save: function (location_id) {
+    const SQL = `INSERT INTO ${this.tableName} (trail_url, name, location, length, condition_date, condition_time, conditions, stars, star_votes, summary, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);`;
+    const values = [this.trail_url, this.name, this.location, this.length, this.condition_date, this.condition_time, this.conditions, this.stars, this.star_votes, this.summary, this.created_at, location_id];
+
+    client.query(SQL, values);
+  }
+}
+
 
 // Make sure the server is listening for requests
 app.listen(PORT, () => console.log(`App is up on ${PORT}`));
