@@ -156,6 +156,34 @@ function getMovies(request, response) {
   })
 }
 
+//Meetups Handlers
+function getMeetups(request, response) {
+  Meetup.lookup({
+    tableName: Meetup.tableName,
+
+    location: request.query.data.id,
+    
+    cacheHit: function (result) {
+      response.send(result.rows);
+    },
+
+    cacheMiss: function () {
+      const url = `https://api.meetup.com/find/upcoming_events?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&page=20`;
+
+      return superagent.get(url)
+        .then(result => {
+          const meetupSummaries = result.body.events.map(meetups => {
+            const summary = new Meetup(meetups);
+            summary.save(request.query.data.id);
+            return summary;
+          });
+          response.send(meetupSummaries);
+        })
+        .catch(error => handleError(error, response));
+    }
+  })
+}
+
 // Helpers
 // These functions are assigned to properties on the models
 
@@ -191,18 +219,18 @@ function lookup(options) {
 //     .catch(error => handleError(error, response));
 // }
 
-function getMeetups(request, response) {
-  const url = `https://api.meetup.com/find/upcoming_events?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&page=20`;
+// function getMeetups(request, response) {
+//   const url = `https://api.meetup.com/find/upcoming_events?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&page=20`;
 
-  superagent.get(url)
-    .then(result => {
-      const meetupSummaries = result.body.events.map(meetups => {
-        return new Meetup(meetups);
-      });
-      response.send(meetupSummaries);
-    })
-    .catch(error => handleError(error, response));
-}
+//   superagent.get(url)
+//     .then(result => {
+//       const meetupSummaries = result.body.events.map(meetups => {
+//         return new Meetup(meetups);
+//       });
+//       response.send(meetupSummaries);
+//     })
+//     .catch(error => handleError(error, response));
+// }
 
 function getTrails(request, response) {
   const url = `https://www.hikingproject.com/data/get-trails?lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&key=${process.env.HIKING_API_KEY}`;
@@ -345,13 +373,30 @@ Movie.prototype = {
   }
 }
 
+//Meetups model
 
 function Meetup(meetups) {
+  this.tableName = 'meetups';
   this.link = meetups.link;
   this.name = meetups.name;
   this.host = meetups.group.name;
   this.creation_date = new Date(meetups.created).toDateString();
+  this.created_at = Date.now();
 }
+
+Meetup.tableName = 'meetups';
+Meetup.lookup = lookup;
+// Meetup.deleteByLocationId = deleteByLocationId;
+
+Meetup.prototype = {
+  save: function (location_id) {
+    const SQL = `INSERT INTO ${this.tableName} (link, name, host, creation_date, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6);`;
+    const values = [this.link, this.name, this.host, this.creation_date, this.created_at, location_id];
+
+    client.query(SQL, values);
+  }
+}
+
 
 function Trail(hikes) {
   this.trail_url = hikes.trail_url;

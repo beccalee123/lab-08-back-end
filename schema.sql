@@ -1,4 +1,4 @@
-DROP TABLE locations, weathers, restaurants, movies;
+DROP TABLE locations, weathers, restaurants, movies, meetups;
 
 CREATE TABLE IF NOT EXISTS locations (
   id SERIAL PRIMARY KEY,
@@ -36,6 +36,16 @@ CREATE TABLE IF NOT EXISTS movies (
   image_url VARCHAR(400),
   popularity FLOAT,
   released_on VARCHAR(255),
+  created_at BIGINT,
+  location_id INTEGER NOT NULL REFERENCES locations(id)
+);
+
+CREATE TABLE IF NOT EXISTS meetups (
+  id SERIAL PRIMARY KEY,
+  link VARCHAR(255),
+  name VARCHAR(255),
+  host VARCHAR(255),
+  creation_date VARCHAR(255),
   created_at BIGINT,
   location_id INTEGER NOT NULL REFERENCES locations(id)
 );
