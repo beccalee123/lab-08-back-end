@@ -131,7 +131,7 @@ function getRestaurants(request, response) {
 //MoviesDB handlers
 function getMovies(request, response) {
   Movie.lookup({
-    tablename: Movie.tableName,
+    tableName: Movie.tableName,
 
     location: request.query.data.id,
 
@@ -144,7 +144,7 @@ function getMovies(request, response) {
 
       return superagent.get(url)
       .then(result => {
-        const movieSummaries = result.body.results.map( film => {
+        const movieSummaries = result.body.results.map(film => {
           const summary = new Movie(film);
           summary.save(request.query.data.id);
           return summary;
@@ -152,6 +152,63 @@ function getMovies(request, response) {
         response.send(movieSummaries);
       })
       .catch(error => handleError(error, response));
+    }
+  })
+}
+
+//Meetups Handlers
+function getMeetups(request, response) {
+  Meetup.lookup({
+    tableName: Meetup.tableName,
+
+    location: request.query.data.id,
+    
+    cacheHit: function (result) {
+      response.send(result.rows);
+    },
+
+    cacheMiss: function () {
+      const url = `https://api.meetup.com/find/upcoming_events?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&page=20`;
+
+      return superagent.get(url)
+        .then(result => {
+          const meetupSummaries = result.body.events.map(meetups => {
+            const summary = new Meetup(meetups);
+            summary.save(request.query.data.id);
+            return summary;
+          });
+          response.send(meetupSummaries);
+        })
+        .catch(error => handleError(error, response));
+    }
+  })
+}
+
+//Trails handlers
+
+function getTrails(request, response) {
+  Trail.lookup({
+    tableName: Trail.tableName,
+
+    location: request.query.data.id,
+
+    cacheHit: function(result) {
+      response.send(result.rows);
+    },
+
+    cacheMiss: function () {
+      const url = `https://www.hikingproject.com/data/get-trails?lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&key=${process.env.HIKING_API_KEY}`;
+
+      return superagent.get(url)
+        .then(result => {
+          const trailSummaries = result.body.trails.map(hikes => {
+            const summary = new Trail(hikes);
+            summary.save(request.query.data.id);
+            return summary;
+          });
+          response.send(trailSummaries);
+        })
+        .catch(error => handleError(error, response));
     }
   })
 }
@@ -191,31 +248,31 @@ function lookup(options) {
 //     .catch(error => handleError(error, response));
 // }
 
-function getMeetups(request, response) {
-  const url = `https://api.meetup.com/find/upcoming_events?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&page=20`;
+// function getMeetups(request, response) {
+//   const url = `https://api.meetup.com/find/upcoming_events?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&page=20`;
 
-  superagent.get(url)
-    .then(result => {
-      const meetupSummaries = result.body.events.map(meetups => {
-        return new Meetup(meetups);
-      });
-      response.send(meetupSummaries);
-    })
-    .catch(error => handleError(error, response));
-}
+//   superagent.get(url)
+//     .then(result => {
+//       const meetupSummaries = result.body.events.map(meetups => {
+//         return new Meetup(meetups);
+//       });
+//       response.send(meetupSummaries);
+//     })
+//     .catch(error => handleError(error, response));
+// }
 
-function getTrails(request, response) {
-  const url = `https://www.hikingproject.com/data/get-trails?lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&key=${process.env.HIKING_API_KEY}`;
+// function getTrails(request, response) {
+//   const url = `https://www.hikingproject.com/data/get-trails?lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&key=${process.env.HIKING_API_KEY}`;
 
-  superagent.get(url)
-    .then(result => {
-      const trailSummaries = result.body.trails.map(hikes => {
-        return new Trail(hikes);
-      });
-      response.send(trailSummaries);
-    })
-    .catch(error => handleError(error, response));
-}
+//   superagent.get(url)
+//     .then(result => {
+//       const trailSummaries = result.body.trails.map(hikes => {
+//         return new Trail(hikes);
+//       });
+//       response.send(trailSummaries);
+//     })
+//     .catch(error => handleError(error, response));
+// }
 
 //Error Handling
 
@@ -321,7 +378,7 @@ Restaurant.prototype = {
 //MoviesDB model
 
 function Movie(film) {
-  this.tableName = 'movies'
+  this.tableName = 'movies';
   this.title = film.title;
   this.overview = film.overview;
   this.average_votes = film.vote_average;
@@ -345,15 +402,34 @@ Movie.prototype = {
   }
 }
 
+//Meetups model
 
 function Meetup(meetups) {
+  this.tableName = 'meetups';
   this.link = meetups.link;
   this.name = meetups.name;
   this.host = meetups.group.name;
   this.creation_date = new Date(meetups.created).toDateString();
+  this.created_at = Date.now();
 }
 
+Meetup.tableName = 'meetups';
+Meetup.lookup = lookup;
+// Meetup.deleteByLocationId = deleteByLocationId;
+
+Meetup.prototype = {
+  save: function (location_id) {
+    const SQL = `INSERT INTO ${this.tableName} (link, name, host, creation_date, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6);`;
+    const values = [this.link, this.name, this.host, this.creation_date, this.created_at, location_id];
+
+    client.query(SQL, values);
+  }
+}
+
+//Trails model
+
 function Trail(hikes) {
+  this.tableName = 'trails'
   this.trail_url = hikes.trail_url;
   this.name = hikes.name;
   this.location = hikes.location;
@@ -364,7 +440,22 @@ function Trail(hikes) {
   this.stars = hikes.stars;
   this.star_votes = hikes.starVotes;
   this.summary = hikes.summary;
+  this.created_at = Date.now();
 }
+
+Trail.tableName = 'trails';
+Trail.lookup = lookup;
+// Trail.deleteByLocationId = deleteByLocationId;
+
+Trail.prototype = {
+  save: function (location_id) {
+    const SQL = `INSERT INTO ${this.tableName} (trail_url, name, location, length, condition_date, condition_time, conditions, stars, star_votes, summary, created_at, location_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);`;
+    const values = [this.trail_url, this.name, this.location, this.length, this.condition_date, this.condition_time, this.conditions, this.stars, this.star_votes, this.summary, this.created_at, location_id];
+
+    client.query(SQL, values);
+  }
+}
+
 
 // Make sure the server is listening for requests
 app.listen(PORT, () => console.log(`App is up on ${PORT}`));
