@@ -24,12 +24,6 @@ client.on('error', err => console.error(err));
 
 // API Routes
 
-// app.get('/location', (request, response) => {
-//   searchToLatLong(request.query.data)
-//     .then((location) => response.send(location))
-//     .catch((error) => handleError(error, response));
-// });
-
 app.get('/location', getLocation);
 app.get('/weather', getWeather);
 app.get('/yelp', getRestaurants);
@@ -78,7 +72,13 @@ function getWeather(request, response) {
     location: request.query.data.id,
 
     cacheHit: function (result) {
-      response.send(result.rows);
+      let ageOfResultsInMinutes = (Date.now() - result.rows[0].created_at) / (1000 * 60);
+      if (ageOfResultsInMinutes > 30) {
+        Weather.deleteByLocationId(Weather.tableName, request.query.data.id);
+        this.cacheMiss();
+      } else {
+        response.send(result.rows);
+      }
     },
 
     cacheMiss: function () {
@@ -107,7 +107,13 @@ function getRestaurants(request, response) {
     location: request.query.data.id,
 
     cacheHit: function (result) {
-      response.send(result.rows);
+      let ageOfResultsInMinutes = (Date.now() - result.rows[0].created_at) / (1000 * 60);
+      if (ageOfResultsInMinutes > 30) {
+        Restaurant.deleteByLocationId(Restaurant.tableName, request.query.data.id);
+        this.cacheMiss();
+      } else {
+        response.send(result.rows);
+      }
     },
 
     cacheMiss: function () {
@@ -232,47 +238,11 @@ function lookup(options) {
     .catch(error => handleError(error));
 }
 
-//old code
-
-// function getMovies(request, response) {
-//   const url = `https://api.themoviedb.org/3/search/movie?api_key=${process.env.MOVIESDB_API_KEY}&language=en-US&query=${request.query.data.search_query}`
-
-//   superagent.get(url)
-//     .then(result => {
-//       // console.log(result.body);
-//       const movieSummaries = result.body.results.map(film => {
-//         return new Movie(film);
-//       });
-//       response.send(movieSummaries);
-//     })
-//     .catch(error => handleError(error, response));
-// }
-
-// function getMeetups(request, response) {
-//   const url = `https://api.meetup.com/find/upcoming_events?key=${process.env.MEETUP_API_KEY}&lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&page=20`;
-
-//   superagent.get(url)
-//     .then(result => {
-//       const meetupSummaries = result.body.events.map(meetups => {
-//         return new Meetup(meetups);
-//       });
-//       response.send(meetupSummaries);
-//     })
-//     .catch(error => handleError(error, response));
-// }
-
-// function getTrails(request, response) {
-//   const url = `https://www.hikingproject.com/data/get-trails?lat=${request.query.data.latitude}&lon=${request.query.data.longitude}&key=${process.env.HIKING_API_KEY}`;
-
-//   superagent.get(url)
-//     .then(result => {
-//       const trailSummaries = result.body.trails.map(hikes => {
-//         return new Trail(hikes);
-//       });
-//       response.send(trailSummaries);
-//     })
-//     .catch(error => handleError(error, response));
-// }
+//Clear the DB for a location if it's stale
+function deleteByLocationId(table, city) {
+  const SQL = `DELETE from ${table} WHERE location_id=${city};`;
+  return client.query(SQL);
+}
 
 //Error Handling
 
@@ -339,7 +309,7 @@ function Weather(day) {
 
 Weather.tableName = 'weathers';
 Weather.lookup = lookup;
-// Weather.deleteByLocationId = deleteByLocationId;
+Weather.deleteByLocationId = deleteByLocationId;
 
 Weather.prototype = {
   save: function (location_id) {
