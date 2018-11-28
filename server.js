@@ -131,7 +131,7 @@ function getRestaurants(request, response) {
 //MoviesDB handlers
 function getMovies(request, response) {
   Movie.lookup({
-    tablename: Movie.tableName,
+    tableName: Movie.tableName,
 
     location: request.query.data.id,
 
@@ -144,7 +144,7 @@ function getMovies(request, response) {
 
       return superagent.get(url)
       .then(result => {
-        const movieSummaries = result.body.results.map( film => {
+        const movieSummaries = result.body.results.map(film => {
           const summary = new Movie(film);
           summary.save(request.query.data.id);
           return summary;
@@ -321,7 +321,7 @@ Restaurant.prototype = {
 //MoviesDB model
 
 function Movie(film) {
-  this.tableName = 'movies'
+  this.tableName = 'movies';
   this.title = film.title;
   this.overview = film.overview;
   this.average_votes = film.vote_average;
