@@ -107,8 +107,9 @@ function getRestaurants(request, response) {
     location: request.query.data.id,
 
     cacheHit: function (result) {
-      let ageOfResultsInMinutes = (Date.now() - result.rows[0].created_at) / (1000 * 60);
-      if (ageOfResultsInMinutes > 30) {
+      //below the 1000 * 60 is a minute. So for an hour, 1000 * 60 * 60, for a day, 1000 * 60 * 60 * 24. For different intervals (ie days, hours), make a new function name, do the math according to what is outlined in this comment
+      let ageOfResultsInDays = (Date.now() - result.rows[0].created_at) / (1000 * 60 * 60 * 24);
+      if (ageOfResultsInDays > 30 ) {
         Restaurant.deleteByLocationId(Restaurant.tableName, request.query.data.id);
         this.cacheMiss();
       } else {
@@ -142,7 +143,13 @@ function getMovies(request, response) {
     location: request.query.data.id,
 
     cacheHit: function (result) {
-      response.send(result.rows);
+      let ageOfResultsInDays = (Date.now() - result.rows[0].created_at) / (1000 * 60 * 60 * 24);
+      if (ageOfResultsInDays > 30 ) {
+        Movie.deleteByLocationId(Move.tableName, request.query.data.id);
+        this.cacheMiss();
+      } else {
+        response.send(result.rows);
+      }
     },
 
     cacheMiss: function () {
@@ -170,7 +177,13 @@ function getMeetups(request, response) {
     location: request.query.data.id,
     
     cacheHit: function (result) {
-      response.send(result.rows);
+      let ageOfResultsInDays = (Date.now() - result.rows[0].created_at) / (1000 * 60 * 60 * 24);
+      if (ageOfResultsInDays > 7 ) {
+        Meetup.deleteByLocationId(Meetup.tableName, request.query.data.id);
+        this.cacheMiss();
+      } else {
+        response.send(result.rows);
+      }
     },
 
     cacheMiss: function () {
@@ -199,7 +212,13 @@ function getTrails(request, response) {
     location: request.query.data.id,
 
     cacheHit: function(result) {
-      response.send(result.rows);
+      let ageOfResultsInDays = (Date.now() - result.rows[0].created_at) / (1000 * 60 * 60 * 24);
+      if (ageOfResultsInDays > 30 ) {
+        Trail.deleteByLocationId(Trail.tableName, request.query.data.id);
+        this.cacheMiss();
+      } else {
+        response.send(result.rows);
+      }
     },
 
     cacheMiss: function () {
@@ -334,7 +353,7 @@ function Restaurant(business) {
 
 Restaurant.tableName = 'restaurants';
 Restaurant.lookup = lookup;
-// Restaurant.deleteByLocationId = deleteByLocationId;
+Restaurant.deleteByLocationId = deleteByLocationId;
 
 Restaurant.prototype = {
   save: function (location_id) {
@@ -361,7 +380,7 @@ function Movie(film) {
 
 Movie.tableName = 'movies';
 Movie.lookup = lookup;
-// Movie.deleteByLocationId = deleteByLocationId;
+Movie.deleteByLocationId = deleteByLocationId;
 
 Movie.prototype = {
   save: function (location_id) {
@@ -385,7 +404,7 @@ function Meetup(meetups) {
 
 Meetup.tableName = 'meetups';
 Meetup.lookup = lookup;
-// Meetup.deleteByLocationId = deleteByLocationId;
+Meetup.deleteByLocationId = deleteByLocationId;
 
 Meetup.prototype = {
   save: function (location_id) {
@@ -415,7 +434,7 @@ function Trail(hikes) {
 
 Trail.tableName = 'trails';
 Trail.lookup = lookup;
-// Trail.deleteByLocationId = deleteByLocationId;
+Trail.deleteByLocationId = deleteByLocationId;
 
 Trail.prototype = {
   save: function (location_id) {
