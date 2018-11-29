@@ -306,7 +306,7 @@ Location.lookupLocation = (location) => {
 //Location.prototype.save = function() and so on
 Location.prototype = {
   save: function () {
-    const SQL = `INSERT INTO locations (search_query, formatted_query, latitude, longitude) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`
+    const SQL = `INSERT INTO locations (search_query, formatted_query, latitude, longitude) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING RETURNING id;`;
     const values = [this.search_query, this.formatted_query, this.latitude, this.longitude];
 
     return client.query(SQL, values)
